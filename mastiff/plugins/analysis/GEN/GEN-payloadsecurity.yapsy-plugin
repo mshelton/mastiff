@@ -1,0 +1,10 @@
+[Core]
+Name = Payload Security
+Module = GEN-payloadsecurity
+
+[Documentation]
+Description = Payload Security Online Submission Plug-in
+Author = Matt Shelton
+Version = 1.0
+Website = www.hybrid-analysis.com
+License = Apache License, Version 2.0
