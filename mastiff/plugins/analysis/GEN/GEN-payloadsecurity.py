@@ -119,7 +119,7 @@ class GenPayloadSecurity(gen.GenericCat):
                     and data['response'].has_key('error') \
                     and data['response']['error'].find('Exceeded maximum API requests') > -1:
                 # Quota reached...  Wait and then try again.
-                log.debug("Exceeded maximum Payload Security API requests.  Waiting.")
+                log.info("Exceeded maximum Payload Security API requests.  Waiting.")
                 time.sleep(60)
             else:
                 # Something unexpected happened.  Exit out!
