@@ -47,6 +47,7 @@ import json
 import urllib2
 import os
 import socket
+import time
 
 import mastiff.plugins.category.generic as gen
 
@@ -57,23 +58,20 @@ class GenPayloadSecurity(gen.GenericCat):
         """Initialize the plugin."""
         self.api_key = None
         self.secret = None
+        self.quota_wait = False
         gen.GenericCat.__init__(self)
 
-    def retrieve(self, sha256):
-        """
-        Retrieve results for this hash from Payload Security.
-        """
+    def _get(self, url):
+        """Perform a basic GET request to the Payload Security API."""
+        log = logging.getLogger('Mastiff.Plugins.' + self.name + '._get')
 
-        log = logging.getLogger('Mastiff.Plugins.' + self.name + '.retrieve')
+        headers = {'User-Agent' : 'VxStream'}
 
-        url = "https://www.hybrid-analysis.com/api/scan/%s?apikey=%s&secret=%s" % (sha256, self.api_key, self.secret)
-        headers = { 'User-Agent' : 'VxStream' }
-        
         # set up request
         log.debug('Submitting request to Payload Security')
 
         try:
-            req = urllib2.Request(url, headers = headers)
+            req = urllib2.Request(url, headers=headers)
             response = urllib2.urlopen(req, timeout=30)
         except urllib2.HTTPError, err:
             log.error('Unable to contact URL: %s', err)
@@ -85,24 +83,54 @@ class GenPayloadSecurity(gen.GenericCat):
             log.error('Timeout when contacting URL: %s', err)
             return None
         except Exception, err:
-            log.error('Unknown Error when opening connection: %s' % err)
+            log.error('Unknown Error when opening connection: %s', err)
             return None
 
         data = response.read()
         try:
             response_dict = json.loads(data)
-        except simplejson.decoder.JSONDecodeError:
+        except Exception:
             log.error('Error in Payload Security JSON response. Are you submitting too fast?')
             return None
         else:
             log.debug('Response received.')
             return response_dict
 
+    def retrieve(self, sha256):
+        """
+        Retrieve results for this hash from Payload Security.
+        """
+        log = logging.getLogger('Mastiff.Plugins.' + self.name + '.retrieve')
+
+        # Make the initial API connection
+        url = "https://www.hybrid-analysis.com/api/scan/%s?apikey=%s&secret=%s" \
+                % (sha256, self.api_key, self.secret)
+
+        # Make the API call and wait if the quota has been reached.
+        for i in xrange(20):
+            data = self._get(url)
+            if self.quota_wait is False:
+                # We have been configured to NOT wait for an API to free up.
+                return data
+            elif data.has_key('response_code') and data['response_code'] == 0:
+                # Query worked!
+                return data
+            elif data.has_key('response') and isinstance(data['response'], dict) \
+                    and data['response'].has_key('error') \
+                    and data['response']['error'].find('Exceeded maximum API requests') > -1:
+                # Quota reached...  Wait and then try again.
+                log.debug("Exceeded maximum Payload Security API requests.  Waiting.")
+                time.sleep(60)
+            else:
+                # Something unexpected happened.  Exit out!
+                log.error("Unexpected Payload Security API error:  %s", data)
+                break
+
     def analyze(self, config, filename):
         """Analyze the file."""
 
         # sanity check to make sure we can run
-        if self.is_activated == False:
+        if self.is_activated is False:
             return False
         log = logging.getLogger('Mastiff.Plugins.' + self.name)
         log.info('Starting execution.')
@@ -117,6 +145,12 @@ class GenPayloadSecurity(gen.GenericCat):
             log.error('No Payload Security API Secret - exiting.')
             return False
 
+        quota_wait = config.get_var(self.name, 'quota_wait')
+        if quota_wait.strip().lower() == "on":
+            self.quota_wait = True
+        else:
+            self.quota_wait = False
+
         sha256 = config.get_var('Misc', 'hashes')[2]
 
         response = self.retrieve(sha256)
@@ -124,7 +158,8 @@ class GenPayloadSecurity(gen.GenericCat):
             # error occurred
             log.error('Did not get a response from Payload Security. Exiting.')
             return False
-        elif response.has_key('response') and type(response['response']) == dict and response['response'].has_key('error'):
+        elif response.has_key('response') and isinstance(response['response'], dict) \
+                and response['response'].has_key('error'):
             log.error(response['response']['error'])
             return False
 
@@ -142,8 +177,9 @@ class GenPayloadSecurity(gen.GenericCat):
         log = logging.getLogger('Mastiff.Plugins.' + self.name + 'output_file')
 
         # Ensure that Payload Security returned a result.
-        if response.has_key('response_code') and response['response_code'] == 0 and len(response['response']) == 0:
-            log.debug("No results found in Payload Security's response.  Not writing report to disk.")
+        if response.has_key('response_code') and response['response_code'] == 0 \
+                and len(response['response']) == 0:
+            log.debug("Nothing found to write to report file.")
             return True
 
         try:
