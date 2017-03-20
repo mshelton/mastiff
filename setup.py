@@ -26,7 +26,7 @@ setup(
     author_email='mastiff-project@korelogic.com',
     data_files=[('/etc/mastiff', ['mastiff.conf'])],
     description="""MASTIFF is a static analysis automation framework.""",
-    install_requires=['Yapsy == 1.10, !=1.10-python3'],
+    install_requires=['Yapsy >= 1.10, !=1.10-python3'],
     license='Apache License V2.0',
     long_description="""MASTIFF is a static analysis framework that automates the
 process of extracting key characteristics from a number of different file
