@@ -1,0 +1,10 @@
+[Core]
+Name = FireEye AX 
+Module = GEN-fireeye-ax
+
+[Documentation]
+Description = FireEye AX Malware Analysis Submission Plug-in 
+Author = Matt Shelton
+Version = 1.0
+Website = www.fireeye.com
+License = Apache License, Version 2.0
