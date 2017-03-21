@@ -362,7 +362,8 @@ class GenFireEyeAX(gen.GenericCat):
                     and res['explanation'].has_key('malwareDetected') \
                     and res['explanation']['malwareDetected'].has_key('malware'):
                 for mal in res['explanation']['malwareDetected']['malware']:
-                    malware[mal['name']] = True
+                    if mal.has_key('name'):
+                        malware[mal['name']] = True
 
             # Parse out CNC services
             domains = {}
@@ -380,10 +381,10 @@ class GenFireEyeAX(gen.GenericCat):
 
             # Create the actual alert record
             alert = {
-                'occurred' : res['occurred'],
-                'name'     : res['name'],
-                'alertUrl' : res['alertUrl'],
-                'severity' : res['severity'],
+                'occurred' : res.get('occurred', None),
+                'name'     : res.get('name', None),
+                'alertUrl' : res.get('alertUrl', None),
+                'severity' : res.get('severity', None),
                 'malware'  : malware.keys(),
                 'hosts'    : ips.keys(),
                 'domains'  : domains.keys(),
